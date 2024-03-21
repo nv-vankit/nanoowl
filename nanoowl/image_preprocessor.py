@@ -73,3 +73,19 @@ class ImagePreprocessor(torch.nn.Module):
         image = image.to(self.mean.device)
         image = image.type(self.mean.dtype)
         return self.forward(image, inplace=True)
+    
+    @torch.no_grad()
+    def preprocess_tensor_image(self, image: torch.Tensor) -> torch.Tensor:
+        # Assuming the input image tensor is in the shape (H, W, C)
+        assert image.dim() == 3, "Input image tensor must have 3 dimensions (H, W, C)"
+        assert image.size(2) == 3, "Input image tensor must have 3 channels (RGB)"
+        # Permute the tensor to match the expected shape (N, C, H, W)
+        image = image.permute(2, 0, 1)[None, ...]
+        # Convert the image tensor to the same device as self.mean
+        image = image.to(self.mean.device)
+
+        # Convert the data type of the image tensor to match self.mean
+        image = image.type(self.mean.dtype)
+
+        # Assuming self.forward is a method in your class
+        return self.forward(image, inplace=True)

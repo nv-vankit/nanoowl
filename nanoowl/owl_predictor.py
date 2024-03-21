@@ -454,23 +454,73 @@ class OwlPredictor(torch.nn.Module):
 
         return self.load_image_encoder_engine(engine_path, max_batch_size)
 
+
     def predict(self, 
-            image: PIL.Image, 
-            text: List[str], 
-            text_encodings: Optional[OwlEncodeTextOutput],
-            threshold: Union[int, float, List[Union[int, float]]] = 0.1,
-            pad_square: bool = True,
-            
-        ) -> OwlDecodeOutput:
+                image: Union[PIL.Image.Image, torch.Tensor], 
+                text: List[str], 
+                text_encodings: Optional[OwlEncodeTextOutput],
+                threshold: Union[int, float, List[Union[int, float]]] = 0.1,
+                pad_square: bool = True,
+            ) -> OwlDecodeOutput:
+        
+        if isinstance(image, PIL.Image.Image):
+            image_tensor = self.image_preprocessor.preprocess_pil_image(image)
 
-        image_tensor = self.image_preprocessor.preprocess_pil_image(image)
+            rois = torch.tensor([[0, 0, image.width, image.height]], dtype=image_tensor.dtype, device=image_tensor.device)
+           
+        elif isinstance(image, torch.Tensor):
+            image_tensor = self.image_preprocessor.preprocess_tensor_image(image)
 
+            rois = torch.tensor([[0, 0, image.shape[1], image.shape[0]]], dtype=image_tensor.dtype, device=image_tensor.device)
+           
+        else:
+            raise ValueError("Input image must be either a PIL Image or a torch.Tensor")
+        
         if text_encodings is None:
             text_encodings = self.encode_text(text)
-
-        rois = torch.tensor([[0, 0, image.width, image.height]], dtype=image_tensor.dtype, device=image_tensor.device)
-
+        
         image_encodings = self.encode_rois(image_tensor, rois, pad_square=pad_square)
-
+        
         return self.decode(image_encodings, text_encodings, threshold)
+    
+    # def predict(self, 
+    #         image: PIL.Image, 
+    #         text: List[str], 
+    #         text_encodings: Optional[OwlEncodeTextOutput],
+    #         threshold: Union[int, float, List[Union[int, float]]] = 0.1,
+    #         pad_square: bool = True,
+            
+    #     ) -> OwlDecodeOutput:
 
+    #     image_tensor = self.image_preprocessor.preprocess_pil_image(image)
+    #     print(image_tensor)
+    #     if text_encodings is None:
+    #         text_encodings = self.encode_text(text)
+
+    #     rois = torch.tensor([[0, 0, image.width, image.height]], dtype=image_tensor.dtype, device=image_tensor.device)
+
+    #     image_encodings = self.encode_rois(image_tensor, rois, pad_square=pad_square)
+
+    #     return self.decode(image_encodings, text_encodings, threshold)
+    
+    # def predictTensor(self, 
+    #                   image: torch.Tensor,
+    #                   text: List[str],
+    #                   text_encodings: Optional[OwlEncodeTextOutput],
+    #                   threshold: Union[int, float, List[Union[int, float]]] = 0.1,
+    #                   pad_square: bool = True,
+                      
+    #                 ) -> OwlDecodeOutput:
+        
+    #     image_tensor = self.image_preprocessor.preprocess_tensor_image(image)
+
+    #     if text_encodings is None:
+    #         text_encodings = self.encode_text(text)
+    #     print(image_tensor)
+    #     #print(image.shape[1])
+    #     rois = torch.tensor([[0, 0, image.shape[1], image.shape[0]]], dtype=image_tensor.dtype, device=image_tensor.device)
+
+    #     image_encodings = self.encode_rois(image_tensor, rois, pad_square=pad_square)
+        
+    #     return self.decode(image_encodings, text_encodings, threshold)
+        
