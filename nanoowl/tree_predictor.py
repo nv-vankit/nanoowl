@@ -21,7 +21,7 @@ from .image_preprocessor import ImagePreprocessor
 
 import torch
 import PIL.Image
-from typing import Optional, Tuple, List, Mapping, Dict
+from typing import Optional, Tuple, List, Mapping, Dict, Union
 from dataclasses import dataclass
 
 
@@ -76,7 +76,7 @@ class TreePredictor(torch.nn.Module):
     
     @torch.no_grad()
     def predict(self, 
-            image: PIL.Image.Image, 
+            image: Union[PIL.Image.Image, torch.Tensor], 
             tree: Tree, 
             threshold: float = 0.1,
             clip_text_encodings: Optional[Dict[int, ClipEncodeTextOutput]] = None,
@@ -89,10 +89,22 @@ class TreePredictor(torch.nn.Module):
         if owl_text_encodings is None:
             owl_text_encodings = self.encode_owl_text(tree)
         
-        image_tensor = self.image_preprocessor.preprocess_pil_image(image)
-        boxes = {
+        if isinstance(image, PIL.Image.Image):
+            image_tensor = self.image_preprocessor.preprocess_pil_image(image)
+            boxes = {
             0: torch.tensor([[0, 0, image.width, image.height]], dtype=image_tensor.dtype, device=image_tensor.device)
-        }
+            }
+           
+        elif isinstance(image, torch.Tensor):
+            image_tensor = self.image_preprocessor.preprocess_tensor_image(image)
+            boxes = {
+            0: torch.tensor([[0, 0, image.shape[1], image.shape[0]]], dtype=image_tensor.dtype, device=image_tensor.device)
+            }
+           
+        else:
+            raise ValueError("Input image must be either a PIL Image or a torch.Tensor")
+        
+       
         scores = {
             0: torch.tensor([1.], dtype=torch.float, device=image_tensor.device)
         }
