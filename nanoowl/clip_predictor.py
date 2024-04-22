@@ -21,6 +21,7 @@ from torchvision.ops import roi_align
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
 from .image_preprocessor import ImagePreprocessor
+from typing import Optional, Tuple, List, Mapping, Dict, Union
 
 
 __all__ = [
@@ -143,14 +144,22 @@ class ClipPredictor(torch.nn.Module):
         )
 
     def predict(self, 
-            image: PIL.Image, 
+            image: Union[PIL.Image.Image, torch.Tensor], 
             text: List[str], 
             text_encodings: Optional[ClipEncodeTextOutput],
             pad_square: bool = True,
             threshold: float = 0.1
         ) -> ClipDecodeOutput:
 
-        image_tensor = self.image_preprocessor.preprocess_pil_image(image)
+        if isinstance(image, PIL.Image.Image):
+            image_tensor = self.image_preprocessor.preprocess_pil_image(image)
+            
+        elif isinstance(image, torch.Tensor):
+            image_tensor = self.image_preprocessor.preprocess_tensor_image(image)
+           
+        else:
+            raise ValueError("Input image must be either a PIL Image or a torch.Tensor")
+        
 
         if text_encodings is None:
             text_encodings = self.encode_text(text)

@@ -33,6 +33,13 @@ class TreeDetection:
     labels: List[int]
     scores: List[int]
 
+@dataclass
+class OwlDecodeOutput:
+    labels: torch.Tensor
+    scores: torch.Tensor
+    boxes: torch.Tensor
+    input_indices: torch.Tensor
+
 
 @dataclass
 class TreeOutput:
@@ -96,6 +103,7 @@ class TreePredictor(torch.nn.Module):
             }
            
         elif isinstance(image, torch.Tensor):
+            print("Tensor")
             image_tensor = self.image_preprocessor.preprocess_tensor_image(image)
             boxes = {
             0: torch.tensor([[0, 0, image.shape[1], image.shape[0]]], dtype=image_tensor.dtype, device=image_tensor.device)
@@ -206,23 +214,52 @@ class TreePredictor(torch.nn.Module):
                         queue.append(buf)
 
         # Fill outputs
-        detections: Dict[int, TreeDetection] = {}
+        # detections: Dict[int, TreeDetection] = {}
+        # for i in boxes.keys():
+        #     for box, score, instance_id, parent_instance_id in zip(boxes[i], scores[i], instance_ids[i], parent_instance_ids[i]):
+        #         instance_id = int(instance_id)
+        #         score = float(score)
+        #         box = box.tolist()
+        #         parent_instance_id = int(parent_instance_id)
+        #         if instance_id in detections:
+        #             detections[instance_id].labels.append(i)
+        #             detections[instance_id].scores.append(score)
+        #         else:
+        #             detections[instance_id] = TreeDetection(
+        #                 id=instance_id,
+        #                 parent_id=parent_instance_id,
+        #                 box=box,
+        #                 labels=[i],
+        #                 scores=[score]
+        #             )
+
+        # return TreeOutput(detections=detections.values())
+
+        all_labels = []
+        all_scores = []
+        all_boxes = []
+        all_parent_ids = []
+
         for i in boxes.keys():
             for box, score, instance_id, parent_instance_id in zip(boxes[i], scores[i], instance_ids[i], parent_instance_ids[i]):
                 instance_id = int(instance_id)
                 score = float(score)
                 box = box.tolist()
                 parent_instance_id = int(parent_instance_id)
-                if instance_id in detections:
-                    detections[instance_id].labels.append(i)
-                    detections[instance_id].scores.append(score)
-                else:
-                    detections[instance_id] = TreeDetection(
-                        id=instance_id,
-                        parent_id=parent_instance_id,
-                        box=box,
-                        labels=[i],
-                        scores=[score]
-                    )
 
-        return TreeOutput(detections=detections.values())
+                all_labels.append(i)
+                all_scores.append(score)
+                all_boxes.append(box)
+                all_parent_ids.append(parent_instance_id)
+
+        labels_tensor = torch.tensor(all_labels, dtype=torch.int64)
+        scores_tensor = torch.tensor(all_scores, dtype=torch.float16)
+        boxes_tensor = torch.tensor(all_boxes, dtype=torch.float16)
+        parent_ids_tensor = torch.tensor(all_parent_ids, dtype=torch.int64)
+
+        return OwlDecodeOutput(
+            labels=labels_tensor,
+            scores=scores_tensor,
+            boxes=boxes_tensor,
+            input_indices=parent_ids_tensor
+        )

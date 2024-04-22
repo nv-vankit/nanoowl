@@ -160,6 +160,10 @@ class OwlPredictor(torch.nn.Module):
         self.num_patches_per_side = self.image_size // self.patch_size
         self.box_bias = _owl_compute_box_bias(self.num_patches_per_side).to(self.device)
         self.num_patches = (self.num_patches_per_side)**2
+        print(self.patch_size)
+        print(self.device)
+        print(image_encoder_engine)
+        print(model_name)
         self.mesh_grid = torch.stack(
             torch.meshgrid(
                 torch.linspace(0., 1., self.image_size),
@@ -314,6 +318,59 @@ class OwlPredictor(torch.nn.Module):
             input_indices=input_indices[mask]
         )
 
+    # def decode(self, 
+    #         image_output: OwlEncodeImageOutput, 
+    #         text_output: OwlEncodeTextOutput,
+    #         threshold: Union[int, float, List[Union[int, float]]] = 0.1,
+    #     ) -> OwlDecodeOutput:
+
+    #     if isinstance(threshold, (int, float)):
+    #         threshold = [threshold] * len(text_output.text_embeds) #apply single threshold to all labels 
+
+    #     num_input_images = image_output.image_class_embeds.shape[0]
+
+    #     image_class_embeds = image_output.image_class_embeds
+    #     print("Image class embeddings shape:", image_class_embeds.shape)  # Debugging
+    #     image_class_embeds = image_class_embeds / (torch.linalg.norm(image_class_embeds, dim=-1, keepdim=True) + 1e-6)
+    #     query_embeds = text_output.text_embeds
+    #     print("Query embeddings shape:", query_embeds.shape)  # Debugging
+    #     query_embeds = query_embeds / (torch.linalg.norm(query_embeds, dim=-1, keepdim=True) + 1e-6)
+    #     logits = torch.einsum("...pd,...qd->...pq", image_class_embeds, query_embeds)
+    #     print("Logits shape:", logits.shape)  # Debugging
+    #     logits = (logits + image_output.logit_shift) * image_output.logit_scale
+        
+    #     scores_sigmoid = torch.sigmoid(logits)
+    #     scores_max = scores_sigmoid.max(dim=-1)
+    #     labels = scores_max.indices
+    #     scores = scores_max.values
+    #     masks = []
+    #     for i, thresh in enumerate(threshold):
+    #         label_mask = labels == i
+    #         score_mask = scores > thresh
+    #         obj_mask = torch.logical_and(label_mask,score_mask)
+    #         masks.append(obj_mask) 
+        
+    #     mask = masks[0]
+    #     for mask_t in masks[1:]:
+    #         mask = torch.logical_or(mask, mask_t)
+
+    #     input_indices = torch.arange(0, num_input_images, dtype=labels.dtype, device=labels.device)
+    #     print(input_indices.shape)
+    #     print(self.num_patches)
+    #     input_indices = input_indices[:, None].repeat(1, self.num_patches)
+
+    #     print("Labels shape before masking:", labels.shape)  # Debugging
+    #     print("Scores shape before masking:", scores.shape)  # Debugging
+    #     print("Image output boxes shape before masking:", image_output.pred_boxes.shape)  # Debugging
+    #     print("Input indices shape before masking:", input_indices.shape)  # Debugging
+    #     print(input_indices)
+    #     return OwlDecodeOutput(
+    #         labels=labels[mask],
+    #         scores=scores[mask],
+    #         boxes=image_output.pred_boxes[mask],
+    #         input_indices=input_indices[mask]
+    #     )
+
     @staticmethod
     def get_image_encoder_input_names():
         return ["image"]
@@ -429,7 +486,7 @@ class OwlPredictor(torch.nn.Module):
 
     def build_image_encoder_engine(self, 
             engine_path: str, 
-            max_batch_size: int = 1, 
+            max_batch_size: int = 2, 
             fp16_mode = True, 
             onnx_path: Optional[str] = None,
             onnx_opset: int = 17
