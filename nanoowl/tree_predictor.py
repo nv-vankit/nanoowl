@@ -103,7 +103,6 @@ class TreePredictor(torch.nn.Module):
             }
            
         elif isinstance(image, torch.Tensor):
-            print("Tensor")
             image_tensor = self.image_preprocessor.preprocess_tensor_image(image)
             boxes = {
             0: torch.tensor([[0, 0, image.shape[1], image.shape[0]]], dtype=image_tensor.dtype, device=image_tensor.device)
