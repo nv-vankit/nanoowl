@@ -106,8 +106,6 @@ def _owl_compute_box_bias(num_patches_per_side):
 
 
 def _owl_box_roi_to_box_global(boxes, rois):
-    # print("boxes shape", boxes)
-    # print("rois", rois)
     x0y0 = rois[..., :2]
     x1y1 = rois[..., 2:]
     wh = (x1y1 - x0y0).repeat(1, 1, 2)
@@ -136,10 +134,11 @@ class OwlEncodeImageOutput:
 
 @dataclass
 class OwlDecodeOutput:
-    labels: List[torch.Tensor]
-    scores: List[torch.Tensor]
-    boxes: List[torch.Tensor]
-    input_indices: List[torch.Tensor]
+    labels: torch.Tensor
+    scores: torch.Tensor
+    boxes: torch.Tensor
+    input_indices: torch.Tensor
+
 
 class OwlPredictor(torch.nn.Module):
     
@@ -161,11 +160,10 @@ class OwlPredictor(torch.nn.Module):
         self.num_patches_per_side = self.image_size // self.patch_size
         self.box_bias = _owl_compute_box_bias(self.num_patches_per_side).to(self.device)
         self.num_patches = (self.num_patches_per_side)**2
-        # print(self.patch_size)
-        # print(self.device)
-        # print(image_encoder_engine)
-        # print(model_name)
-        # print(image_encoder_engine_max_batch_size)
+        print(self.patch_size)
+        print(self.device)
+        print(image_encoder_engine)
+        print(model_name)
         self.mesh_grid = torch.stack(
             torch.meshgrid(
                 torch.linspace(0., 1., self.image_size),
@@ -177,7 +175,6 @@ class OwlPredictor(torch.nn.Module):
             image_encoder_engine = OwlPredictor.load_image_encoder_engine(image_encoder_engine, image_encoder_engine_max_batch_size)
         self.image_encoder_engine = image_encoder_engine
         self.image_preprocessor = image_preprocessor.to(self.device).eval() if image_preprocessor else ImagePreprocessor().to(self.device).eval()
-       
 
     def get_num_patches(self):
         return self.num_patches
@@ -244,71 +241,6 @@ class OwlPredictor(torch.nn.Module):
                 dtype=image.dtype,
                 device=image.device
             )
-        # print("Check Extract Roi")
-        # print(rois.shape)   
-        # print(image.shape)
-        # if pad_square:
-        #     # pad square
-        #     w = padding_scale * (rois[..., 2] - rois[..., 0]) / 2
-        #     h = padding_scale * (rois[..., 3] - rois[..., 1]) / 2
-        #     cx = (rois[..., 0] + rois[..., 2]) / 2
-        #     cy = (rois[..., 1] + rois[..., 3]) / 2
-        #     s = torch.max(w, h)
-        #     rois = torch.stack([cx-s, cy-s, cx+s, cy+s], dim=-1)
-
-        #     # compute mask
-        #     pad_x = (s - w) / (2 * s)
-        #     pad_y = (s - h) / (2 * s)
-        #     mask_x = (self.mesh_grid[1][None, ...] > pad_x[..., None, None]) & (self.mesh_grid[1][None, ...] < (1. - pad_x[..., None, None]))
-        #     mask_y = (self.mesh_grid[0][None, ...] > pad_y[..., None, None]) & (self.mesh_grid[0][None, ...] < (1. - pad_y[..., None, None]))
-        #     mask = (mask_x & mask_y)
-
-        # roi_images_list = []
-        # print(image.shape)
-        # print(rois.shape)
-        # for images, roi in zip(image, rois):
-        #     print("Inside")
-        #     if pad_square:
-        #         # pad square
-        #         w = padding_scale * (roi[..., 2] - roi[..., 0]) / 2
-        #         h = padding_scale * (roi[..., 3] - roi[..., 1]) / 2
-        #         cx = (roi[..., 0] + roi[..., 2]) / 2
-        #         cy = (roi[..., 1] + roi[..., 3]) / 2
-        #         s = torch.max(w, h)
-        #         roi = torch.stack([cx-s, cy-s, cx+s, cy+s], dim=-1)
-        #         print(f"roi : {roi.shape}")
-        #         # compute mask
-        #         pad_x = (s - w) / (2 * s)
-        #         pad_y = (s - h) / (2 * s)
-        #         mask_x = (self.mesh_grid[1][None, ...] > pad_x[..., None, None]) & (self.mesh_grid[1][None, ...] < (1. - pad_x[..., None, None]))
-        #         mask_y = (self.mesh_grid[0][None, ...] > pad_y[..., None, None]) & (self.mesh_grid[0][None, ...] < (1. - pad_y[..., None, None]))
-        #         mask = (mask_x & mask_y)
-        #         print(f"Mask : {mask.shape}")
-
-        #     # print([roi])
-        #     # print(roi.shape)
-        #     # extract rois
-        #     print(images.unsqueeze(0).shape)
-        #     print(roi.unsqueeze(0).shape)
-        #     roi_images = roi_align(images.unsqueeze(0), [roi.unsqueeze(0)], output_size=self.get_image_size())
-        #     if pad_square:
-        #         print(mask[:, None, :, :].shape)
-        #         roi_images = (roi_images * mask[:, None, :, :])
-        #         print(f"Roi : {roi_images.shape}")
-        #     roi_images_list.append(roi_images)
-
-        #     print(f" List  {torch.cat(roi_images_list, dim=0).shape} {rois.shape}")
-        # return torch.cat(roi_images_list, dim=0), rois
-
-        # print(f"rois {rois.shape}")
-        # # print(f"roi images{roi_images_list}")
-        # print("Extract roi last")
-        # print(f"roi images{roi_images.shape}")
-        # print(roi_images.shape)
-        # print(image.shape)
-        
-        # # print([rois])
-        # # print(rois)
         if pad_square:
             # pad square
             w = padding_scale * (rois[..., 2] - rois[..., 0]) / 2
@@ -317,68 +249,74 @@ class OwlPredictor(torch.nn.Module):
             cy = (rois[..., 1] + rois[..., 3]) / 2
             s = torch.max(w, h)
             rois = torch.stack([cx-s, cy-s, cx+s, cy+s], dim=-1)
-            # print(f"Rois 1 { rois}")
-            
-            # Create batch indices tensor
-            batch_indices = torch.arange(rois.size(0)).unsqueeze(1).to(rois.device)  # Shape: (batch_size, 1)
 
-            # Concatenate batch indices with ROIs along the last dimension
-            rois_with_index = torch.cat([batch_indices, rois], dim=-1)  # Shape: (batch_size, 5)
-            # print(f"Rois { rois_with_index}")
-            
             # compute mask
             pad_x = (s - w) / (2 * s)
             pad_y = (s - h) / (2 * s)
             mask_x = (self.mesh_grid[1][None, ...] > pad_x[..., None, None]) & (self.mesh_grid[1][None, ...] < (1. - pad_x[..., None, None]))
             mask_y = (self.mesh_grid[0][None, ...] > pad_y[..., None, None]) & (self.mesh_grid[0][None, ...] < (1. - pad_y[..., None, None]))
             mask = (mask_x & mask_y)
-            # print(f"Mask : {mask.shape}")
 
+        # extract rois
+        roi_images = roi_align(image, [rois], output_size=self.get_image_size())
 
-        roi_images = roi_align(image, rois_with_index, output_size=self.get_image_size())
-        # print(f"img {roi_images.shape}")
-
+        # mask rois
         if pad_square:
             roi_images = (roi_images * mask[:, None, :, :])
 
         return roi_images, rois
-        # # Add batch indices to rois
-        # batch_size = image.shape[0]
-        # batch_indices = torch.arange(batch_size, dtype=rois.dtype, device=rois.device).view(-1, 1)
-        # rois = torch.cat([batch_indices, rois], dim=1)
-        # # print(rois.shape)
-        # # extract rois
-        # roi_images = roi_align(image, [rois], output_size=self.get_image_size())
-        # # print("Extract roi")
-        # # print(f"roi images{roi_images.shape}")
-        # # print(roi_images.shape)
-        # # print(image.shape)
-
-        # # mask rois
-        # if pad_square:
-        #     roi_images = (roi_images * mask[:, None, :, :])
-        # # print("Mask roi")
-        # # print(roi_images.shape)
-        # # print(image.shape)
-        # # print(rois.shape)
-        # # print(f"rois {rois}")
-        # # print(f"roi images{roi_images}")
-        # return roi_images, rois
     
     def encode_rois(self, image: torch.Tensor, rois: torch.Tensor, pad_square: bool = True, padding_scale: float=1.0):
         # with torch_timeit_sync("extract rois"):
-        # print(f"Roi Image : {image.shape}")
-        # print(f"Rois Shape : {rois.shape}")
         roi_images, rois = self.extract_rois(image, rois, pad_square, padding_scale)
         # with torch_timeit_sync("encode images"):
-        # print("Check roi")
-        # print(roi_images.shape)
         output = self.encode_image(roi_images)
-        # # print(f"output engine : {output}")
-        # print("Output pred boxes shape", output.pred_boxes.shape)
         pred_boxes = _owl_box_roi_to_box_global(output.pred_boxes, rois[:, None, :])
         output.pred_boxes = pred_boxes
         return output
+
+    def decode(self, 
+            image_output: OwlEncodeImageOutput, 
+            text_output: OwlEncodeTextOutput,
+            threshold: Union[int, float, List[Union[int, float]]] = 0.1,
+        ) -> OwlDecodeOutput:
+
+        if isinstance(threshold, (int, float)):
+            threshold = [threshold] * len(text_output.text_embeds) #apply single threshold to all labels 
+
+        num_input_images = image_output.image_class_embeds.shape[0]
+
+        image_class_embeds = image_output.image_class_embeds
+        image_class_embeds = image_class_embeds / (torch.linalg.norm(image_class_embeds, dim=-1, keepdim=True) + 1e-6)
+        query_embeds = text_output.text_embeds
+        query_embeds = query_embeds / (torch.linalg.norm(query_embeds, dim=-1, keepdim=True) + 1e-6)
+        logits = torch.einsum("...pd,...qd->...pq", image_class_embeds, query_embeds)
+        logits = (logits + image_output.logit_shift) * image_output.logit_scale
+        
+        scores_sigmoid = torch.sigmoid(logits)
+        scores_max = scores_sigmoid.max(dim=-1)
+        labels = scores_max.indices
+        scores = scores_max.values
+        masks = []
+        for i, thresh in enumerate(threshold):
+            label_mask = labels == i
+            score_mask = scores > thresh
+            obj_mask = torch.logical_and(label_mask,score_mask)
+            masks.append(obj_mask) 
+        
+        mask = masks[0]
+        for mask_t in masks[1:]:
+            mask = torch.logical_or(mask, mask_t)
+
+        input_indices = torch.arange(0, num_input_images, dtype=labels.dtype, device=labels.device)
+        input_indices = input_indices[:, None].repeat(1, self.num_patches)
+        print(type(labels[mask]))
+        return OwlDecodeOutput(
+            labels=labels[mask],
+            scores=scores[mask],
+            boxes=image_output.pred_boxes[mask],
+            input_indices=input_indices[mask]
+        )
 
     # def decode(self, 
     #         image_output: OwlEncodeImageOutput, 
@@ -389,19 +327,16 @@ class OwlPredictor(torch.nn.Module):
     #     if isinstance(threshold, (int, float)):
     #         threshold = [threshold] * len(text_output.text_embeds) #apply single threshold to all labels 
 
-    #     # print(f"Num Input :{image_output.image_class_embeds.shape}")
-    #     # print(f"Num Input :{image_output.image_embeds.shape}")
-    #     # print(f"Num Input :{image_output.pred_boxes.shape}")
-    #     # print(f"Num Input :{image_output.logit_scale.shape}")
-    #     # print(f"Num Input :{image_output.logit_shift.shape}")
+    #     num_input_images = image_output.image_class_embeds.shape[0]
 
-    #     num_input_images = image_output.image_class_embeds.shape[1]
-        
     #     image_class_embeds = image_output.image_class_embeds
+    #     print("Image class embeddings shape:", image_class_embeds.shape)  # Debugging
     #     image_class_embeds = image_class_embeds / (torch.linalg.norm(image_class_embeds, dim=-1, keepdim=True) + 1e-6)
     #     query_embeds = text_output.text_embeds
+    #     print("Query embeddings shape:", query_embeds.shape)  # Debugging
     #     query_embeds = query_embeds / (torch.linalg.norm(query_embeds, dim=-1, keepdim=True) + 1e-6)
     #     logits = torch.einsum("...pd,...qd->...pq", image_class_embeds, query_embeds)
+    #     print("Logits shape:", logits.shape)  # Debugging
     #     logits = (logits + image_output.logit_shift) * image_output.logit_scale
         
     #     scores_sigmoid = torch.sigmoid(logits)
@@ -420,181 +355,21 @@ class OwlPredictor(torch.nn.Module):
     #         mask = torch.logical_or(mask, mask_t)
 
     #     input_indices = torch.arange(0, num_input_images, dtype=labels.dtype, device=labels.device)
+    #     print(input_indices.shape)
+    #     print(self.num_patches)
     #     input_indices = input_indices[:, None].repeat(1, self.num_patches)
 
+    #     print("Labels shape before masking:", labels.shape)  # Debugging
+    #     print("Scores shape before masking:", scores.shape)  # Debugging
+    #     print("Image output boxes shape before masking:", image_output.pred_boxes.shape)  # Debugging
+    #     print("Input indices shape before masking:", input_indices.shape)  # Debugging
+    #     print(input_indices)
     #     return OwlDecodeOutput(
     #         labels=labels[mask],
     #         scores=scores[mask],
     #         boxes=image_output.pred_boxes[mask],
     #         input_indices=input_indices[mask]
     #     )
-
-    # def decode(self, 
-    #            image_output: OwlEncodeImageOutput, 
-    #            text_output: OwlEncodeTextOutput,
-    #            threshold: Union[int, float, List[Union[int, float]]] = 0.1,
-    #           ) -> OwlDecodeOutput:
-
-    #     if isinstance(threshold, (int, float)):
-    #         threshold = [threshold] * text_output.text_embeds.shape[1]  # apply single threshold to all labels 
-
-    #     # print(f"Num Input :{image_output.image_class_embeds.shape}")
-    #     # print(f"Num Input :{image_output.image_embeds.shape}")
-    #     # print(f"Num Input :{image_output.pred_boxes.shape}")
-    #     # print(f"Num Input :{image_output.logit_scale.shape}")
-    #     # print(f"Num Input :{image_output.logit_shift.shape}")
-
-    #     all_labels = []
-    #     all_scores = []
-    #     all_boxes = []
-    #     all_input_indices = []
-
-    #     for i in range(8):  # Assuming there are 8 images in the batch
-    #         num_input_images = image_output.image_class_embeds[i].shape[0]
-    #         image_class_embeds = image_output.image_class_embeds[i]
-    #         # print(f"Image : {num_input_images}")
-    #         # print(f"Image : {image_class_embeds.shape}")
-    #         image_class_embeds = image_class_embeds / (torch.linalg.norm(image_class_embeds, dim=(-1,), keepdim=True) + 1e-6)
-    #         query_embeds = text_output.text_embeds
-    #         # print(f"Query : {query_embeds.shape}")
-    #         query_embeds = query_embeds / (torch.linalg.norm(query_embeds, dim=-1, keepdim=True) + 1e-6)
-    #         logits = torch.einsum("...pd,...qd->...pq", image_class_embeds, query_embeds)
-    #         logits = (logits + image_output.logit_shift[i]) * image_output.logit_scale[i]
-
-    #         scores_sigmoid = torch.sigmoid(logits)
-    #         scores_max = scores_sigmoid.max(dim=-1)
-    #         labels = scores_max.indices
-    #         scores = scores_max.values
-    #         masks = []
-    #         for j, thresh in enumerate(threshold):
-    #             label_mask = labels == j
-    #             score_mask = scores > thresh
-    #             obj_mask = torch.logical_and(label_mask, score_mask)
-    #             masks.append(obj_mask) 
-
-    #         mask = masks[0]
-    #         for mask_t in masks[1:]:
-    #             mask = torch.logical_or(mask, mask_t)
-    #         # print(f"Mask: {mask}")
-    #         input_indices = torch.arange(0, num_input_images, dtype=labels.dtype, device=labels.device)
-    #         input_indices = input_indices[:, None].repeat(1, self.num_patches)
-    #         # print(f"Labels : {labels[mask]}")
-    #         # print(f"Labels : {scores[mask]}")
-    #         # print(f"Labels : {input_indices[mask]}")
-    #         # print(f"Labels : {image_output.pred_boxes[i][mask]}")
-    #         all_labels.append(labels[mask])
-    #         all_scores.append(scores[mask])
-    #         all_boxes.append(image_output.pred_boxes[i][mask])
-    #         all_input_indices.append(input_indices[mask])
-        
-            
-    #     # print(f"labels {(all_labels)}")
-    #     # print(f"Scores {(all_scores)}")
-    #     # print(f"boxes {(all_boxes)}")
-    #     # print(f"input_indices {(all_scores)}")
-
-    #     return OwlDecodeOutput(
-    #         labels=torch.cat(all_labels),
-    #         scores=torch.cat(all_scores),
-    #         boxes=torch.cat(all_boxes),
-    #         input_indices=torch.cat(all_input_indices)
-    #     )
-
-    def decode(self, 
-            image_output: OwlEncodeImageOutput, 
-            text_output: OwlEncodeTextOutput,
-            threshold: Union[int, float, List[Union[int, float]]] = 0.1,
-        ) -> OwlDecodeOutput:
-
-        if isinstance(threshold, (int, float)):
-            threshold = [threshold] * len(text_output.text_embeds) #apply single threshold to all labels 
-
-        # print(f"Num Input :{image_output.image_class_embeds.shape}")
-        # print(f"Num Input :{image_output.image_embeds.shape}")
-        # print(f"Num Input :{image_output.pred_boxes.shape}")
-        # print(f"Num Input :{image_output.logit_scale.shape}")
-        # print(f"Num Input :{image_output.logit_shift.shape}")
-        # # print(f"Num Input :{image_output.image_class_embeds}")
-        # # print(f"Num Input :{image_output.image_embeds}")
-        # # print(f"Num Input :{image_output.pred_boxes}")
-        # # print(f"Num Input :{image_output.logit_scale}")
-        # # print(f"Num Input :{image_output.logit_shift}")
-
-        num_input_images = image_output.image_class_embeds.shape[0]
-
-        image_class_embeds = image_output.image_class_embeds
-        # print("Image class embeddings shape:", image_class_embeds.shape)  # Debugging
-        image_class_embeds = image_class_embeds / (torch.linalg.norm(image_class_embeds, dim=-1, keepdim=True) + 1e-6)
-        # # print(f"image_class_embeds : {image_class_embeds}")
-        query_embeds = text_output.text_embeds
-        # print("Query embeddings shape:", query_embeds.shape)  # Debugging
-        # # print(f"query_embeds : {query_embeds}")
-        query_embeds = query_embeds / (torch.linalg.norm(query_embeds, dim=-1, keepdim=True) + 1e-6)
-        # # print(f"query_embeds : {query_embeds}")
-        logits = torch.einsum("...pd,...qd->...pq", image_class_embeds, query_embeds)
-        # print("Logits shape:", logits.shape)  # Debugging
-        logits = (logits + image_output.logit_shift) * image_output.logit_scale
-        # print(f"logits : {logits.shape}")
-        # # print(f"logits : {logits}")
-        scores_sigmoid = torch.sigmoid(logits)
-        # print(f"scores_sigmoid : {scores_sigmoid.shape}")
-        # # print(f"scores_sigmoid : {scores_sigmoid}")
-        scores_max = scores_sigmoid.max(dim=-1)
-        # # print(f"scores_max : {scores_max}")
-        labels = scores_max.indices
-        # print(f"labels : {labels.shape}")
-        # # print(f"labels : {labels}")
-        scores = scores_max.values
-        # # print(f"scores : {scores}")
-        # print(f"scores : {scores.shape}")
-        masks = []
-        for i, thresh in enumerate(threshold):
-            label_mask = labels == i
-            score_mask = scores > thresh
-            obj_mask = torch.logical_and(label_mask,score_mask)
-            masks.append(obj_mask) 
-        # # print(f"masks : {masks}")
-        mask = masks[0]
-        # print(f"mask : {mask}")
-        for mask_t in masks[1:]:
-            mask = torch.logical_or(mask, mask_t)
-        # print(f"mask : {mask.shape}")
-        # # print(f"mask : {mask}")
-
-        # Check if the mask is empty
-        if mask.sum() == 0:
-            print("Warning: The mask is empty. No elements satisfy the conditions.")
-            return OwlDecodeOutput(
-                labels=torch.tensor([], dtype=labels.dtype, device=labels.device),
-                scores=torch.tensor([], dtype=scores.dtype, device=scores.device),
-                boxes=torch.tensor([], dtype=image_output.pred_boxes.dtype, device=image_output.pred_boxes.device),
-                input_indices=torch.tensor([], dtype=labels.dtype, device=labels.device)
-            )
-
-        input_indices = torch.arange(0, num_input_images, dtype=labels.dtype, device=labels.device)
-        # print(input_indices.shape)
-        # print(self.num_patches)
-        input_indices = input_indices[:, None].repeat(1, self.num_patches)
-        # print(input_indices.shape)
-        # print("Labels shape before masking:", labels.shape)  # Debugging
-        # print("Scores shape before masking:", scores.shape)  # Debugging
-        # print("Image output boxes shape before masking:", image_output.pred_boxes.shape)  # Debugging
-        # print("Input indices shape before masking:", input_indices.shape)  # Debugging
-        # # print(input_indices)
-        # print("Labels shape after masking:", len([labels[i][mask[i]] for i in range(labels.size(0))]))  # Debugging
-        # # Print the shapes of the resulting tensors
-        # for i, tensor in enumerate([labels[i][mask[i]] for i in range(labels.size(0))]):
-        #     # print(f"Batch {i} masked labels shape: {tensor.shape}")
-        # print("Scores shape after masking:", len([scores[i][mask[i]] for i in range(scores.size(0))]))  # Debugging
-        # print("Image output boxes shape after masking:", ([image_output.pred_boxes[mask]][0].shape))  # Debugging
-        # print("Input indices shape after masking:", [input_indices[mask]][0].shape)  # Debugging
-
-        return OwlDecodeOutput(
-            labels=[labels[i][mask[i]] for i in range(labels.size(0))],
-            scores=[scores[i][mask[i]] for i in range(scores.size(0))],
-            boxes=[image_output.pred_boxes[i][mask[i]] for i in range(image_output.pred_boxes.size(0))],
-            input_indices=[input_indices[i][mask[i]] for i in range(input_indices.size(0))]
-        )
 
     @staticmethod
     def get_image_encoder_input_names():
@@ -680,26 +455,17 @@ class OwlPredictor(torch.nn.Module):
                 super().__init__()
                 self.base_module = base_module
                 self.max_batch_size = max_batch_size
-                print(self.max_batch_size)
-                self.num = 1
 
             @torch.no_grad()
             def forward(self, image):
-                # print("Check Engine")
-                # print(image.shape)
+
                 b = image.shape[0]
-                # print(b)
 
                 results = []
-                # print(f"Batch : {self.max_batch_size} {b}")
 
                 for start_index in range(0, b, self.max_batch_size):
-                    
                     end_index = min(b, start_index + self.max_batch_size)
                     image_slice = image[start_index:end_index]
-                    # print(f"Num : {self.num}")
-                    # self.num += 1
-                    # print(f"Image {image.shape} {image_slice.shape}")
                     # with torch_timeit_sync("run_engine"):
                     output = self.base_module(image_slice)
                     results.append(
@@ -729,7 +495,7 @@ class OwlPredictor(torch.nn.Module):
         if onnx_path is None:
             onnx_dir = tempfile.mkdtemp()
             onnx_path = os.path.join(onnx_dir, "image_encoder.onnx")
-            self.export_image_encoder_onnx(onnx_path,use_dynamic_axes=True , batch_size=max_batch_size, onnx_opset=onnx_opset)
+            self.export_image_encoder_onnx(onnx_path, onnx_opset=onnx_opset)
 
         args = ["/usr/src/tensorrt/bin/trtexec"]
     
@@ -739,13 +505,7 @@ class OwlPredictor(torch.nn.Module):
         if fp16_mode:
             args += ["--fp16"]
 
-        # Set dynamic shapes for TensorRT
-        # args += [
-        #     f"--minShapes=image:1x3x{self.image_size}x{self.image_size}",
-        #     f"--optShapes=image:{max_batch_size//2}x3x{self.image_size}x{self.image_size}",
-        #     f"--maxShapes=image:{max_batch_size}x3x{self.image_size}x{self.image_size}"
-        # ]
-        args += [f"--shapes=image:{max_batch_size}x3x{self.image_size}x{self.image_size}"]
+        args += [f"--shapes=image:1x3x{self.image_size}x{self.image_size}"]
 
         subprocess.call(args)
 
@@ -766,45 +526,10 @@ class OwlPredictor(torch.nn.Module):
             rois = torch.tensor([[0, 0, image.width, image.height]], dtype=image_tensor.dtype, device=image_tensor.device)
            
         elif isinstance(image, torch.Tensor):
-            # print(text)
-            # print(threshold)
-            # print("Check0")
-            # print(image[0].shape)
-            # print(image.shape)
-            # print(image)
             image_tensor = self.image_preprocessor.preprocess_tensor_image(image)
-            # print(image_tensor.shape[0])
-            # print("Check1")
-            # print(image_tensor.shape)
-            # For single batch
-            # rois = torch.tensor([[0, 0, image.shape[1], image.shape[0]]], dtype=image_tensor.dtype, device=image_tensor.device)
-            # For Multi batch
-            # rois = torch.tensor([[0, 0, image.shape[2], image.shape[1]]], dtype=image_tensor.dtype, device=image_tensor.device)
-            rois = torch.tensor([[0, 0, image.shape[1], image.shape[0]] for image in image], dtype=image_tensor.dtype, device=image_tensor.device)
-            # Adjust rois to match the batch size
-            # batch_size = image.shape[0]
-            # rois = rois.repeat(batch_size, 1)
 
-            # # Add batch indices to rois
-            # batch_indices = torch.arange(batch_size, dtype=rois.dtype, device=rois.device).view(-1, 1)
-            # rois = torch.cat([batch_indices, rois], dim=1)
-            # print(f"rois : {rois.shape} ")  
-            # # Define the batch size, height, and width
-            # batch_size = image.shape[0]
-            # height = image.shape[1]
-            # width = image.shape[2]
-
-            # # Create batch indices
-            # batch_indices = torch.arange(batch_size, dtype=image_tensor.dtype, device=image_tensor.device).view(-1, 1)
-
-            # # Create coordinates for RoIs
-            # coords = torch.tensor([0, 0, width, height], dtype=image_tensor.dtype, device=image_tensor.device).view(1, -1)
-
-            # # Repeat the coordinates for each batch
-            # coords = coords.repeat(batch_size, 1)
-
-            # # Combine batch indices with coordinates
-            # rois = torch.cat((batch_indices, coords), dim=1)
+            rois = torch.tensor([[0, 0, image.shape[1], image.shape[0]]], dtype=image_tensor.dtype, device=image_tensor.device)
+           
         else:
             raise ValueError("Input image must be either a PIL Image or a torch.Tensor")
         
@@ -812,7 +537,7 @@ class OwlPredictor(torch.nn.Module):
             text_encodings = self.encode_text(text)
         
         image_encodings = self.encode_rois(image_tensor, rois, pad_square=pad_square)
-        # print(image_encodings)
+        
         return self.decode(image_encodings, text_encodings, threshold)
     
     # def predict(self, 
@@ -825,7 +550,7 @@ class OwlPredictor(torch.nn.Module):
     #     ) -> OwlDecodeOutput:
 
     #     image_tensor = self.image_preprocessor.preprocess_pil_image(image)
-    #     # print(image_tensor)
+    #     print(image_tensor)
     #     if text_encodings is None:
     #         text_encodings = self.encode_text(text)
 
@@ -848,8 +573,8 @@ class OwlPredictor(torch.nn.Module):
 
     #     if text_encodings is None:
     #         text_encodings = self.encode_text(text)
-    #     # print(image_tensor)
-    #     ## print(image.shape[1])
+    #     print(image_tensor)
+    #     #print(image.shape[1])
     #     rois = torch.tensor([[0, 0, image.shape[1], image.shape[0]]], dtype=image_tensor.dtype, device=image_tensor.device)
 
     #     image_encodings = self.encode_rois(image_tensor, rois, pad_square=pad_square)

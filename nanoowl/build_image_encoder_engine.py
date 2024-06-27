@@ -29,7 +29,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     predictor = OwlPredictor(
-        model_name=args.model_name
+        model_name=args.model_name,
+        image_encoder_engine_max_batch_size= args.batch_size
     )
 
     predictor.build_image_encoder_engine(
